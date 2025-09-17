@@ -1,0 +1,65 @@
+{
+  "name": "enterprise",
+  "version": "1.0.0",
+  "description": "Customer Management System",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "dev": "concurrently \"npm:backend\" \"npm:start-frontend\" \"npm:start\"",
+    "start-frontend": "cd frontend && npm run dev",
+    "backend": "cd backend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "electron-builder"
+  },
+  "keywords": ["Customer Management System", "Inventory Management System", "Sales Management System"],
+  "author": "Phineas Njoroge",
+  "license": "ISC",
+  "type": "module",
+  "build": {
+    "appId": "com.africangarden.enterprise",
+    "productName": "African Garden Enterprise",
+    "asar": false,
+    "icon": "build/icon.ico",
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*",
+      "frontend/dist/**/*",
+      "backend/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "extraMetadata": {
+      "main": "main.js"
+    },
+    "win": {
+      "target": "nsis",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "African Garden Enterprise"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  },
+  "dependencies": {
+    "concurrently": "^9.2.0",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "electron": "^37.2.5",
+    "electron-builder": "^26.0.12"
+  }
+}

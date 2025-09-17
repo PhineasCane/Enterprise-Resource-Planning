@@ -1,0 +1,250 @@
+doctype html
+html
+  head
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    link(rel="shortcut icon" type="image/png" href="/images/icons/favicon.png")
+    style.
+      :root {
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --stripe: #f9fafb;
+        --accent: #52008c;
+      }
+
+      @page {
+        size: A4;
+        margin: 14mm 14mm 18mm 14mm;
+      }
+
+      body {
+        margin: 0;
+        background: #fff;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+        print-color-adjust: exact;
+        padding-bottom: 40mm;
+      }
+
+      *, *:before, *:after { box-sizing: border-box; color: inherit; }
+
+      .top-area {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        border-bottom: 2px solid var(--border);
+        padding-bottom: 8px;
+      }
+
+      .logo { width: 160px; max-width: 40%; height: auto; }
+      .company-info { text-align: right; font-size: 12px; max-width: 60%; word-break: break-word; }
+
+      h1.title {
+        font-size: 28px;
+        color: var(--accent);
+        margin: 12px 0 4px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin: 10px 0 18px;
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: #fff;
+      }
+      .label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+      .value { font-weight: 600; margin-top: 2px; }
+      .lab { color: black; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+
+
+      /* Summary totals at bottom */
+      .summary {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+        margin: 14px 0 0;
+      }
+      .summary .tile {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #fafafb;
+      }
+      .summary .tile .amount {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      /* Rounded invoice table */
+      table.table-invoice {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: fixed;
+        margin-top: 6px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .table-invoice thead th {
+        text-align: right;
+        padding: 10px 12px;
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--accent);
+        border-bottom: 1px solid #c2e0f2;
+        background: #fafafb;
+        white-space: nowrap;
+      }
+      .table-invoice tbody td {
+        padding: 10px 12px;
+        font-size: 11px;
+        text-align: right;
+        word-break: break-word;
+      }
+      .table-invoice tbody tr:nth-child(2n-1) td { background: var(--stripe); }
+
+      .table-invoice th:nth-child(1), .table-invoice td:nth-child(1) { text-align: left; width: 22%; }
+      .table-invoice th:nth-child(2), .table-invoice td:nth-child(2) { text-align: left; width: 36%; }
+      .table-invoice th:nth-child(3), .table-invoice td:nth-child(3) { width: 12%; white-space: nowrap; }
+      .table-invoice th:nth-child(4), .table-invoice td:nth-child(4) { width: 15%; white-space: nowrap; }
+      .table-invoice th:nth-child(5), .table-invoice td:nth-child(5) { width: 15%; white-space: nowrap; }
+
+      .footer {
+        position: fixed;
+        left: 14mm;
+        right: 14mm;
+        bottom: 10mm;
+        color: #5d6975;
+        text-align: center;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+      }
+
+  body
+    header.clearfix
+      .top-area
+        if settings && settings.company_logo
+          - const _logoSrc = settings.public_server_file ? (settings.public_server_file + settings.company_logo) : settings.company_logo
+          img.logo(src=_logoSrc)
+        .company-info
+          p
+            strong #{settings ? settings.company_name : 'Your Company Name'}
+          p #{settings ? settings.company_address : 'Company Address'}
+          if settings && (settings.company_city || settings.company_country)
+            p #{settings.company_city || ''}#{settings.company_city && settings.company_country ? ', ' : ''}#{settings.company_country || ''}
+          if settings && settings.company_reg_number
+            p #{settings.company_reg_number}
+
+    h1.title INVOICE
+
+    // First row of cards
+    .grid
+      .card
+        div
+          div.label Date
+          div.value #{moment(model.date).format(dateFormat)}
+        div(style="margin-top:8px")
+          div.label Due Date
+          div.value #{moment(model.dueDate).format(dateFormat)}
+        div(style="margin-top:8px")
+          div.label Number
+          div.value # #{model.number || model.invoiceNumber}
+      .card
+        div.label Bill To
+        if model.Customer
+          div.value Name: #{model.Customer.name}
+          if model.Customer.email
+            div.lab Email: #{model.Customer.email}
+          if model.Customer.city || model.Customer.country
+            div.lab Country: #{model.Customer.city || ''}#{model.Customer.city && model.Customer.country ? ', ' : ''}#{model.Customer.country || ''}
+          if model.Customer.phone
+            div.lab Phone: #{model.Customer.phone}
+        else
+          div.value #{model.customerName || 'Customer Name'}
+          if model.customerEmail
+            div #{model.customerEmail}
+          if model.customerAddress
+            div #{model.customerAddress}
+
+    // Second row of cards: Contact & Payment Details
+    .grid
+      .card
+        div.label Contact
+        if contactDetail
+          div.value Name: #{contactDetail.name || 'Contact Name'}
+          if contactDetail.email
+            div.lab Email: #{contactDetail.email}
+          if contactDetail.telephone
+            div.lab Telephone: #{contactDetail.telephone}
+          if contactDetail.department
+            div.lab Department: #{contactDetail.department}
+        else
+          div(style="color:#999") No contact details available
+       
+      .card
+        div.label Payment Details
+        if paymentDetail
+          if paymentDetail.name
+            div.value Name: #{paymentDetail.name}
+          if paymentDetail.bank
+            div.lab Bank: #{paymentDetail.bank}
+          if paymentDetail.accountNumber
+            div.lab Account Number: #{paymentDetail.accountNumber}
+          if paymentDetail.branch
+            div.lab Branch: #{paymentDetail.branch}
+          if paymentDetail.bankCode
+            div.lab Bank Code: #{paymentDetail.bankCode}
+          if paymentDetail.branchCode
+            div.lab Branch Code: #{paymentDetail.branchCode}
+          if paymentDetail.swiftCode
+            div.lab Swift Code: #{paymentDetail.swiftCode}
+        else
+          div(style="color:#999") No payment details available
+
+    // Invoice table
+    table.table-invoice
+      thead
+        tr
+          th Item
+          th Description
+          th Quantity
+          th Price
+          th Total
+      tbody
+        if model.items && model.items.length > 0
+          each item in model.items
+            tr
+              td #{item.item || item.name || item.itemName || 'Unknown Item'}
+              td #{item.description || ''}
+              td #{item.quantity}
+              td #{item.pricePer ? (item.pricePer).toLocaleString() : (item.price ? (item.price).toLocaleString() : '0')}
+              td #{item.total ? (item.total).toLocaleString() : '0'}
+        else
+          tr
+            td(colspan='5' style='text-align:center;color:#999;padding:12px') No items found
+
+    // Summary tiles moved here
+    .summary
+      .tile
+        div.label Subtotal
+        div.amount #{(model.subtotal || 0).toLocaleString()} #{settings && settings.currency ? settings.currency : ''}
+      .tile
+        div.label Tax #{model.taxRate || 0}%
+        div.amount #{(model.taxAmount || 0).toLocaleString()} #{settings && settings.currency ? settings.currency : ''}
+      .tile
+        div.label Total
+        div.amount #{(model.total || 0).toLocaleString()} #{settings && settings.currency ? settings.currency : ''}
+
+    .footer
+      p #{settings ? settings.invoice_footer : 'Thank you for your business!'}

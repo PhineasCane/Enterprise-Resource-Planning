@@ -1,0 +1,253 @@
+doctype html
+html
+  head
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    link(rel="shortcut icon" type="image/png" href="/images/icons/favicon.png")
+    style.
+      :root{
+        --ink:#1f2937;
+        --muted:#6b7280;
+        --border:#e5e7eb;
+        --stripe:#f9fafb;
+        --accent:#52008c;
+        --success:#0f766e;
+        --warn:#b45309;
+      }
+
+      @page{
+        size: A4;
+        margin: 14mm 14mm 18mm 14mm;
+      }
+
+      html, body{ height: auto; min-height: 100%; }
+
+      body{
+        margin: 0;
+        background: #fff;
+        color: var(--ink);
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        font-size: 12px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding-bottom: 40mm; /* space for fixed footer */
+      }
+
+      *, *:before, *:after{ box-sizing: border-box; color: inherit; }
+
+      .clearfix::after{ content:""; display: table; clear: both; }
+
+      .top-area{
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        width: 100%;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--border);
+      }
+
+      .logo{ width: 160px; max-width: 40%; height: auto; }
+      .company-info{ text-align: right; font-size: 12px; max-width: 60%; word-break: break-word; }
+
+      h1.title{
+        font-size: 28px;
+        color: var(--accent);
+        margin: 12px 0 4px;
+        letter-spacing: 0.3px;
+      }
+      .badge{
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: .3px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        padding: 3px 8px;
+        vertical-align: middle;
+        margin-left: 8px;
+      }
+      .badge.paid{ color: var(--success); }
+
+      .grid{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin: 10px 0 18px;
+      }
+      .card{
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: #fff;
+      }
+      .label{ color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+      .value{ font-weight: 600; margin-top: 2px; }
+      .lab { color: black; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+
+      .summary{
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin: 6px 0 14px;
+      }
+      .summary .tile{
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px 20px;
+        background: #fafafb;
+        text-align: center;
+      }
+      .summary .tile .amount{
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--success);
+      }
+
+      .payment-details{
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px;
+        margin: 16px 0;
+        background: #fff;
+      }
+
+      .payment-details h3{
+        margin: 0 0 12px 0;
+        color: var(--accent);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .detail-row{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #f3f4f6;
+      }
+
+      .detail-row:last-child{
+        border-bottom: none;
+      }
+
+      .detail-label{
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .detail-value{
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .notes{
+        margin-top: 16px;
+        padding: 12px 14px;
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+        color: var(--muted);
+      }
+
+      .footer{
+        position: fixed;
+        left: 14mm;
+        right: 14mm;
+        bottom: 10mm;
+        color: #5d6975;
+        text-align: center;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+      }
+
+  body
+    header.clearfix
+      .top-area
+        if settings && settings.company_logo
+          - const _logoSrc = settings.public_server_file ? (settings.public_server_file + settings.company_logo) : settings.company_logo
+          img.logo(src=_logoSrc)
+        .company-info
+          p
+            strong #{settings ? settings.company_name : 'Your Company Name'}
+          p #{settings ? settings.company_address : 'Company Address'}
+          if settings && (settings.company_city || settings.company_country)
+            p #{settings.company_city || ''}#{settings.company_city && settings.company_country ? ', ' : ''}#{settings.company_country || ''}
+          if settings && settings.company_reg_number
+            p #{settings.company_reg_number}
+
+    h1.title
+      | PAYMENT RECEIPT
+      span.badge.paid PAID
+
+    .grid
+      .card
+        div
+          div.label Payment ID
+          div.value #{model.id || '—'}
+        div(style="margin-top:8px")
+          div.label Date
+          div.value #{moment(model.date || model.createdAt).format(dateFormat)}
+        if model && model.method
+          div(style="margin-top:8px")
+            div.label Payment Method
+            div.value #{model.method ? model.method.replace(/_/g, ' ').toUpperCase() : '—'}
+        if model && model.reference
+          div(style="margin-top:8px")
+            div.label Reference
+            div.value #{model.reference}
+      .card
+        div.label Customer
+        if model && model.Invoice && model.Invoice.Customer
+          div.value Name: #{model.Invoice.Customer.name}
+          if model.Invoice.Customer.email
+            div.lab Email: #{model.Invoice.Customer.email}
+          if model.Invoice.Customer.phone
+            div.lab Phone: #{model.Invoice.Customer.phone}
+          if model.Invoice.Customer.address
+            div.lab Address: #{model.Invoice.Customer.address}
+          if model.Invoice.Customer.city
+            div.lab City: #{model.Invoice.Customer.city}
+          if model.Invoice.Customer.country
+            div.lab Country: #{model.Invoice.Customer.country}
+        else
+          div.value Customer Name
+
+    .summary
+      .tile
+        div.label Amount Received
+        - const currency = (settings && settings.currency) ? settings.currency : 'KES'
+        div.amount #{currency} #{Number(model.amount || 0).toLocaleString()}
+
+    .payment-details
+      h3 Payment Information
+      .detail-row
+        .detail-label Invoice Number
+        .detail-value #{model.Invoice ? model.Invoice.number : '—'}
+      .detail-row
+        .detail-label Invoice Amount
+        .detail-value #{currency} #{Number(model.Invoice ? model.Invoice.total : 0).toLocaleString()}
+      .detail-row
+        .detail-label Payment Amount
+        .detail-value #{currency} #{Number(model.amount || 0).toLocaleString()}
+      .detail-row
+        .detail-label Payment Date
+        .detail-value #{moment(model.date || model.createdAt).format(dateFormat)}
+      .detail-row
+        .detail-label Payment Method
+        .detail-value #{model.method ? model.method.replace(/_/g, ' ').toUpperCase() : '—'}
+      if model && model.reference
+        .detail-row
+          .detail-label Reference
+          .detail-value #{model.reference}
+
+    if model && model.notes
+      .notes
+        div.label Notes
+        div #{model.notes}
+
+    .footer
+      p #{settings ? settings.invoice_footer : 'Thank you for your business!'}
