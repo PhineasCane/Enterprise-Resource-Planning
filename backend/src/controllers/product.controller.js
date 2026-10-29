@@ -90,10 +90,10 @@ exports.getProduct = async (req, res) => {
 // POST /api/products
 exports.createProduct = async (req, res) => {
   try {
-    const { name, description, pricePer, status } = req.body;
+    const { name, sku, description, pricePer, costPrice, unit, status } = req.body;
 
     // Validate required fields
-    if (!name || !pricePer) {
+    if (!name || pricePer === undefined) {
       return res.status(400).json({ 
         message: "Missing required fields: name and pricePer are required" 
       });
@@ -102,8 +102,11 @@ exports.createProduct = async (req, res) => {
     // Create product
     const product = await Product.create({
       name,
+      sku: sku || null,
       description,
       pricePer,
+      costPrice: costPrice || 0,
+      unit: unit || "pcs",
       status: status || 'active'
     });
 
@@ -145,7 +148,7 @@ exports.createProduct = async (req, res) => {
 // PUT /api/products/:id
 exports.updateProduct = async (req, res) => {
   try {
-    const { name, description, pricePer, status } = req.body;
+    const { name, sku, description, pricePer, costPrice, unit, status } = req.body;
     const product = await Product.findByPk(req.params.id);
     
     if (!product) {
@@ -155,8 +158,11 @@ exports.updateProduct = async (req, res) => {
     // Update product
     await product.update({
       name,
+      sku,
       description,
       pricePer,
+      costPrice,
+      unit,
       status
     });
 

@@ -5,8 +5,11 @@ const { ensureNumeric } = require("../utils/formatter");
 const Product = sequelize.define("Product", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name: { type: DataTypes.STRING, allowNull: false },
+  sku: { type: DataTypes.STRING, allowNull: true },
   description: { type: DataTypes.TEXT },
   pricePer: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0 },
+  costPrice: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0 },
+  unit: { type: DataTypes.STRING, allowNull: false, defaultValue: "pcs" },
   status: { 
     type: DataTypes.ENUM('active', 'inactive', 'discontinued'), 
     defaultValue: 'active' 
@@ -21,17 +24,27 @@ Product.beforeCreate(async (product) => {
   if (product.pricePer !== undefined) {
     product.pricePer = ensureNumeric(product.pricePer);
   }
+  if (product.costPrice !== undefined) {
+    product.costPrice = ensureNumeric(product.costPrice);
+  }
 });
 
 Product.beforeUpdate(async (product) => {
   if (product.changed('pricePer')) {
     product.pricePer = ensureNumeric(product.pricePer);
   }
+  if (product.changed('costPrice')) {
+    product.costPrice = ensureNumeric(product.costPrice);
+  }
 });
 
 // Virtual getter methods on prototype
 Product.prototype.getPricePer = function() {
   return parseFloat(this.getDataValue('pricePer')) || 0;
+};
+
+Product.prototype.getCostPrice = function() {
+  return parseFloat(this.getDataValue('costPrice')) || 0;
 };
 
 Product.prototype.getQuantity = function() {
@@ -63,6 +76,7 @@ Product.prototype.toJSON = function() {
   };
   
   values.pricePer = safeParseFloat(values.pricePer);
+  values.costPrice = safeParseFloat(values.costPrice);
   
   // Add virtual fields
   values.quantity = this.getQuantity();

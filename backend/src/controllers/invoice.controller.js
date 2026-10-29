@@ -75,16 +75,21 @@ exports.fetchInvoices = async (req, res) => {
   // Transform the data to include computed fields
   const transformedRows = data.rows.map(invoice => ({
     ...invoice.toJSON(),
-    items: invoice.items.map(item => ({
-      id: item.id,
-      productId: item.productId,
-      quantity: item.quantity,
-      // Computed fields from Product
-      item: item.Product.name,
-      description: item.Product.description,
-      pricePer: item.Product.pricePer,
-      total: item.quantity * item.Product.pricePer
-    }))
+    items: (invoice.items || []).map(item => {
+      const pricePer = parseFloat(item.pricePer ?? item.unitPrice ?? item.Product?.pricePer ?? 0);
+      const total = parseFloat(item.total ?? (item.quantity * pricePer));
+      return {
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        item: item.productName || item.Product?.name || 'Item',
+        name: item.productName || item.Product?.name || 'Item',
+        description: item.description || item.Product?.description || '',
+        pricePer,
+        unitPrice: pricePer,
+        total
+      };
+    })
   }));
   
 
@@ -113,16 +118,21 @@ exports.getInvoice = async (req, res) => {
   // Transform the data to include computed fields
   const transformedInvoice = {
     ...invoice.toJSON(),
-    items: invoice.items.map(item => ({
-      id: item.id,
-      productId: item.productId,
-      quantity: item.quantity,
-      // Computed fields from Product
-      item: item.Product.name,
-      description: item.Product.description,
-      pricePer: item.Product.pricePer,
-      total: item.quantity * item.Product.pricePer
-    }))
+    items: (invoice.items || []).map(item => {
+      const pricePer = parseFloat(item.pricePer ?? item.unitPrice ?? item.Product?.pricePer ?? 0);
+      const total = parseFloat(item.total ?? (item.quantity * pricePer));
+      return {
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        item: item.productName || item.Product?.name || 'Item',
+        name: item.productName || item.Product?.name || 'Item',
+        description: item.description || item.Product?.description || '',
+        pricePer,
+        unitPrice: pricePer,
+        total
+      };
+    })
   };
 
   res.json(transformedInvoice);
@@ -182,12 +192,12 @@ exports.createInvoice = async (req, res) => {
     // Generate invoice number if not provided
     const invoiceNumber = number || await generateNextInvoiceNumber();
 
-    // Calculate totals using current product data
+    // Calculate totals using current product data or item-specific price
     let subtotal = 0;
     const validatedItems = items.map(item => {
       const product = products.find(p => p.id === parseInt(item.productId));
       const quantity = parseInt(item.quantity) || 1;
-      const pricePer = parseFloat(product.pricePer) || 0;
+      const pricePer = parseFloat(item.pricePer !== undefined ? item.pricePer : product.pricePer) || 0;
       const total = quantity * pricePer;
       subtotal += total;
       
@@ -195,14 +205,14 @@ exports.createInvoice = async (req, res) => {
         productId: parseInt(item.productId),
         quantity,
         pricePer,
-        total
+        total,
+        productName: product.name,
+        description: item.description || product.description || ''
       };
     });
 
     const taxAmount = subtotal * (parseFloat(taxRate || 0) / 100);
     const total = subtotal + taxAmount;
-
-    console.log('Calculated totals:', { subtotal, taxAmount, total });
 
     // Create invoice
     const invoice = await Invoice.create({
@@ -216,36 +226,42 @@ exports.createInvoice = async (req, res) => {
       taxRate: taxRate || 0,
       subtotal,
       taxAmount,
-      total
+      total,
+      paidAmount: 0
     }, { transaction });
 
-    // Create invoice items and decrease inventory
+    // Create invoice items and decrease inventory atomically
     const invoiceItems = [];
-    for (const item of items) {
+    for (const item of validatedItems) {
       const product = products.find(p => p.id === parseInt(item.productId));
-      const quantity = parseInt(item.quantity) || 1;
       
-      // Create invoice item
+      // Create invoice item with snapshotted pricing
       const invoiceItem = await InvoiceItem.create({
         invoiceId: invoice.id,
-        productId: parseInt(item.productId),
-        quantity
+        productId: item.productId,
+        productName: item.productName,
+        description: item.description,
+        unitPrice: item.pricePer,
+        pricePer: item.pricePer,
+        total: item.total,
+        quantity: item.quantity
       }, { transaction });
       
       invoiceItems.push(invoiceItem);
       
-      // Decrease inventory (Stock Out)
-      await InventoryService.stockOut(
-        product.id,
-        product.name,
-        quantity,
-        'Invoice Sale',
-        `Invoice #${invoiceNumber}`,
-        `Sold ${quantity} units in invoice ${invoiceNumber}`
-      );
+      // Decrease inventory (Stock Out) atomically only if invoice is not a draft or cancelled
+      if (invoice.status !== 'draft' && invoice.status !== 'cancelled') {
+        await InventoryService.stockOut(
+          product.id,
+          product.name,
+          item.quantity,
+          'Invoice Sale',
+          `Invoice #${invoiceNumber}`,
+          `Sold ${item.quantity} units in invoice ${invoiceNumber}`,
+          { transaction }
+        );
+      }
     }
-
-    console.log('Created invoice items and updated inventory:', JSON.stringify(invoiceItems, null, 2));
 
     // Fetch the complete invoice with computed data
     const fullInvoice = await Invoice.findByPk(invoice.id, {
@@ -262,19 +278,22 @@ exports.createInvoice = async (req, res) => {
       transaction
     });
 
-    // Transform the data to include computed fields
     const transformedInvoice = {
       ...fullInvoice.toJSON(),
-      items: fullInvoice.items.map(item => ({
-        id: item.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        // Computed fields from Product
-        item: item.Product.name,
-        description: item.Product.description,
-        pricePer: item.Product.pricePer,
-        total: item.quantity * item.Product.pricePer
-      }))
+      items: fullInvoice.items.map(item => {
+        const pricePer = parseFloat(item.pricePer ?? item.unitPrice ?? item.Product?.pricePer ?? 0);
+        return {
+          id: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          item: item.productName || item.Product?.name || 'Item',
+          name: item.productName || item.Product?.name || 'Item',
+          description: item.description || item.Product?.description || '',
+          pricePer,
+          unitPrice: pricePer,
+          total: parseFloat(item.total ?? (item.quantity * pricePer))
+        };
+      })
     };
 
     await transaction.commit();
@@ -405,7 +424,7 @@ exports.updateInvoice = async (req, res) => {
         // Calculate quantity change
         const quantityChange = newQuantity - originalQuantity;
         
-        if (quantityChange !== 0) {
+        if (quantityChange !== 0 && invoice.status !== 'draft' && invoice.status !== 'cancelled') {
           const product = await Product.findByPk(productId, { transaction });
           
           if (quantityChange > 0) {
@@ -416,7 +435,8 @@ exports.updateInvoice = async (req, res) => {
               quantityChange,
               'Invoice Update - Quantity Increase',
               `Invoice #${invoice.number}`,
-              `Increased quantity by ${quantityChange} units in invoice ${invoice.number}`
+              `Increased quantity by ${quantityChange} units in invoice ${invoice.number}`,
+              { transaction }
             );
           } else if (quantityChange < 0) {
             // Quantity decreased - increase inventory (Stock In)
@@ -426,7 +446,8 @@ exports.updateInvoice = async (req, res) => {
               Math.abs(quantityChange),
               'Invoice Update - Quantity Decrease',
               `Invoice #${invoice.number}`,
-              `Decreased quantity by ${Math.abs(quantityChange)} units in invoice ${invoice.number}`
+              `Decreased quantity by ${Math.abs(quantityChange)} units in invoice ${invoice.number}`,
+              { transaction }
             );
           }
         }
@@ -435,14 +456,24 @@ exports.updateInvoice = async (req, res) => {
       // Delete existing items
       await InvoiceItem.destroy({ where: { invoiceId: id }, transaction });
       
-      // Create new items
-      const invoiceItems = items.map((item) => ({
-        invoiceId: id,
-        productId: parseInt(item.productId),
-        quantity: parseInt(item.quantity) || 1
-      }));
+      // Create new items with snapshotted fields
+      const invoiceItems = items.map((item) => {
+        const product = products.find(p => p.id === parseInt(item.productId));
+        const pricePer = parseFloat(item.pricePer !== undefined ? item.pricePer : (product?.pricePer || 0)) || 0;
+        const quantity = parseInt(item.quantity) || 1;
+        return {
+          invoiceId: id,
+          productId: parseInt(item.productId),
+          productName: product?.name || item.name || '',
+          description: item.description || product?.description || '',
+          unitPrice: pricePer,
+          pricePer,
+          total: quantity * pricePer,
+          quantity
+        };
+      });
 
-      console.log('Updating invoice items:', JSON.stringify(invoiceItems, null, 2));
+      console.log('Updating invoice items with snapshot:', JSON.stringify(invoiceItems, null, 2));
       await InvoiceItem.bulkCreate(invoiceItems, { transaction });
     }
 
@@ -464,16 +495,20 @@ exports.updateInvoice = async (req, res) => {
     // Transform the data to include computed fields
     const transformedInvoice = {
       ...updatedInvoice.toJSON(),
-      items: updatedInvoice.items.map(item => ({
-        id: item.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        // Computed fields from Product
-        item: item.Product.name,
-        description: item.Product.description,
-        pricePer: item.Product.pricePer,
-        total: item.quantity * item.Product.pricePer
-      }))
+      items: updatedInvoice.items.map(item => {
+        const pricePer = parseFloat(item.pricePer ?? item.unitPrice ?? item.Product?.pricePer ?? 0);
+        return {
+          id: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          item: item.productName || item.Product?.name || 'Item',
+          name: item.productName || item.Product?.name || 'Item',
+          description: item.description || item.Product?.description || '',
+          pricePer,
+          unitPrice: pricePer,
+          total: parseFloat(item.total ?? (item.quantity * pricePer))
+        };
+      })
     };
 
     await transaction.commit();
@@ -487,17 +522,66 @@ exports.updateInvoice = async (req, res) => {
 
 // PATCH /api/invoices/:id - Update invoice status only
 exports.updateInvoiceStatus = async (req, res) => {
+  const transaction = await require("../models").sequelize.transaction();
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    const invoice = await Invoice.findByPk(id);
+    const invoice = await Invoice.findByPk(id, {
+      include: [{ model: InvoiceItem, as: 'items', include: [{ model: Product, as: 'Product' }] }],
+      transaction
+    });
     if (!invoice) {
+      await transaction.rollback();
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    // Update only the status
-    await invoice.update({ status });
+    const prevStatus = invoice.status;
+
+    // Handle inventory transitions when status changes
+    if (prevStatus !== 'cancelled' && status === 'cancelled') {
+      // Cancelled: return items to inventory
+      for (const item of (invoice.items || [])) {
+        await InventoryService.stockIn(
+          item.productId,
+          item.productName || item.Product?.name || 'Item',
+          item.quantity,
+          'Invoice Cancellation - Stock Restoration',
+          `Invoice #${invoice.number}`,
+          `Restored ${item.quantity} units due to invoice ${invoice.number} cancellation`,
+          { transaction }
+        );
+      }
+    } else if (prevStatus === 'cancelled' && status !== 'cancelled' && status !== 'draft') {
+      // Uncancelled/re-activated: deduct stock
+      for (const item of (invoice.items || [])) {
+        await InventoryService.stockOut(
+          item.productId,
+          item.productName || item.Product?.name || 'Item',
+          item.quantity,
+          'Invoice Reactivation - Stock Deduction',
+          `Invoice #${invoice.number}`,
+          `Deducted ${item.quantity} units due to invoice ${invoice.number} reactivation`,
+          { transaction }
+        );
+      }
+    } else if (prevStatus === 'draft' && status !== 'draft' && status !== 'cancelled') {
+      // Approved draft: deduct stock
+      for (const item of (invoice.items || [])) {
+        await InventoryService.stockOut(
+          item.productId,
+          item.productName || item.Product?.name || 'Item',
+          item.quantity,
+          'Invoice Approval - Stock Deduction',
+          `Invoice #${invoice.number}`,
+          `Deducted ${item.quantity} units upon activating invoice ${invoice.number}`,
+          { transaction }
+        );
+      }
+    }
+
+    // Update the status
+    await invoice.update({ status }, { transaction });
 
     // Fetch the updated invoice with computed data
     const updatedInvoice = await Invoice.findByPk(id, {
@@ -511,25 +595,31 @@ exports.updateInvoiceStatus = async (req, res) => {
         },
         { model: Customer, as: "Customer", attributes: ["id", "name", "email", "address", "phone", "country"] }
       ],
+      transaction
     });
 
-    // Transform the data to include computed fields
     const transformedInvoice = {
       ...updatedInvoice.toJSON(),
-      items: updatedInvoice.items.map(item => ({
-        id: item.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        // Computed fields from Product
-        item: item.Product.name,
-        description: item.Product.description,
-        pricePer: item.Product.pricePer,
-        total: item.quantity * item.Product.pricePer
-      }))
+      items: updatedInvoice.items.map(item => {
+        const pricePer = parseFloat(item.pricePer ?? item.unitPrice ?? item.Product?.pricePer ?? 0);
+        return {
+          id: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          item: item.productName || item.Product?.name || 'Item',
+          name: item.productName || item.Product?.name || 'Item',
+          description: item.description || item.Product?.description || '',
+          pricePer,
+          unitPrice: pricePer,
+          total: parseFloat(item.total ?? (item.quantity * pricePer))
+        };
+      })
     };
 
+    await transaction.commit();
     res.json(transformedInvoice);
   } catch (error) {
+    await transaction.rollback();
     console.error('Error updating invoice status:', error);
     res.status(500).json({ message: "Error updating invoice status", error: error.message });
   }
@@ -561,26 +651,28 @@ exports.deleteInvoice = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    // Restore inventory for all items in the invoice
-    if (invoice.items && invoice.items.length > 0) {
+    // Restore inventory for all items in the invoice if it was an active stock-holding invoice
+    if (invoice.status !== 'draft' && invoice.status !== 'cancelled' && invoice.items && invoice.items.length > 0) {
       for (const item of invoice.items) {
         const product = item.Product;
         const quantity = item.quantity;
         
-        // Restore inventory (Stock In)
+        // Restore inventory (Stock In) atomically
         await InventoryService.stockIn(
-          product.id,
-          product.name,
+          product ? product.id : item.productId,
+          item.productName || (product ? product.name : 'Product'),
           quantity,
           'Invoice Deletion - Stock Restoration',
           `Invoice #${invoice.number}`,
-          `Restored ${quantity} units from deleted invoice ${invoice.number}`
+          `Restored ${quantity} units from deleted invoice ${invoice.number}`,
+          { transaction }
         );
       }
-      
-      console.log(`Restored inventory for ${invoice.items.length} items from invoice #${invoice.number}`);
     }
     
+    // Delete payments associated with this invoice
+    await Payment.destroy({ where: { invoiceId: id }, transaction });
+
     // Delete invoice items first (due to foreign key constraint)
     await InvoiceItem.destroy({ where: { invoiceId: id }, transaction });
     

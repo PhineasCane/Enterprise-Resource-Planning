@@ -214,27 +214,23 @@ export default function Dashboard() {
     }
   };
 
-  // Helper function to format currency - only for Total Revenue card
+  // Helper function to format currency - strictly only for Total Revenue card
   const formatRevenueCurrency = (amount, fromCurrency = "KES") => {
-    if (!rates || !selectedSymbol || amount === 0) {
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "KES",
-      }).format(amount || 0);
+    const num = Number(amount) || 0;
+    if (!selectedSymbol || selectedSymbol === "KSh" || num === 0) {
+      return `KSh ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
-    const targetCurrency = currencyList.find(
+    const targetCurrency = currencyList?.find(
       (c) => c.symbol === selectedSymbol
     )?.code;
-    if (!targetCurrency || targetCurrency === fromCurrency) {
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "KES",
-      }).format(amount || 0);
+
+    if (!targetCurrency || targetCurrency === fromCurrency || !rates || !rates[targetCurrency]) {
+      return `${selectedSymbol} ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
     const rate = rates[targetCurrency];
-    const convertedAmount = rate ? amount * rate : amount;
+    const convertedAmount = rate ? num * rate : num;
 
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -374,61 +370,31 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-gray-100">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Welcome to your control center
+          <div className="flex items-center space-x-3">
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+            <Badge variant="outline" className="text-xs font-normal py-0.5 px-2 bg-blue-50 text-blue-700 border-blue-200">
+              {basicLoading ? "Updating..." : "Live Sync"}
+            </Badge>
+          </div>
+          <p className="text-gray-500 text-sm mt-1">
+            Enterprise overview & real-time business performance
           </p>
-          {stats.dateRange && (
-            <p className="text-sm text-gray-500 mt-1">
-              Showing data from{" "}
-              {new Date(stats.dateRange.start).toLocaleDateString()} to{" "}
-              {new Date(stats.dateRange.end).toLocaleDateString()}
-            </p>
-          )}
-          {/* Auto-refresh indicator */}
-          <div className="flex items-center space-x-2 mt-2">
-            <div className="flex items-center space-x-2 text-xs text-gray-500">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span>Auto-refreshing every 2 minutes</span>
-            </div>
-          </div>
-          
-          {/* Phase 3: Progressive Loading Indicator */}
-          <div className="flex items-center space-x-2 mt-1">
-            <div className="flex items-center space-x-2 text-xs text-gray-500">
-              {basicLoading ? (
-                <>
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                  <span>Loading basic stats...</span>
-                </>
-              ) : detailedLoading ? (
-                <>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span>Loading charts & details...</span>
-                </>
-              ) : (
-                <>
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>All data loaded</span>
-                </>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Time filter, Currency selector, and Refresh controls */}
-        <div className="flex items-center space-x-4">
-          {/* Refresh Button and Last Updated Indicator */}
-          <div className="flex flex-col items-center space-y-1">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Refresh Button */}
+          <div className="flex items-center gap-2">
             <button
               onClick={handleManualRefresh}
               disabled={loading}
-              className="flex items-center space-x-2 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center space-x-2 px-3 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+              title={`Last updated ${getTimeDifference(lastUpdated)}`}
             >
               <svg
-                className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+                className={`w-4 h-4 text-blue-600 ${loading ? 'animate-spin' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -440,100 +406,101 @@ export default function Dashboard() {
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              <span className="text-sm font-medium">Refresh</span>
+              <span>Refresh</span>
             </button>
-            
-            {/* Last Updated Indicator - Now under the button */}
-            <div className="flex items-center space-x-1 text-xs text-gray-500">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Last updated: {getTimeDifference(lastUpdated)}</span>
-            </div>
+            <span className="text-xs text-gray-400 hidden xl:inline">
+              {getTimeDifference(lastUpdated)}
+            </span>
           </div>
 
-          {/* Currency Dropdown */}
-          <div className="flex items-center space-x-2">
-            <Globe className="w-4 h-4 text-gray-500" />
-            <div className="relative currency-dropdown">
-              <button
-                onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
-                className="flex items-center justify-between w-[120px] bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 cursor-pointer shadow-sm"
+          {/* Currency Dropdown (Only for Total Revenue Conversion) */}
+          <div className="relative currency-dropdown">
+            <button
+              onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
+              className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer shadow-sm"
+              title="Convert Revenue KPI currency"
+            >
+              <Globe className="w-4 h-4 text-blue-600" />
+              <span>{selectedSymbol || "KSh"}</span>
+              <svg
+                className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${
+                  isCurrencyOpen ? "rotate-180" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <span>{selectedSymbol || "KSh"}</span>
-                <svg
-                  className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${
-                    isCurrencyOpen ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
 
-              {/* Dropdown Menu */}
-              {isCurrencyOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-auto">
-                  {currencyList && currencyList.length > 0 ? (
-                    currencyList.map((currency) => (
-                      <button
-                        key={currency.code}
-                        onClick={() => {
-                          handleCurrencyChange(currency.symbol);
-                          setIsCurrencyOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors duration-150 ${
-                          selectedSymbol === currency.symbol
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {currency.symbol}
-                      </button>
-                    ))
-                  ) : (
-                    // Fallback currencies if API hasn't loaded yet
-                    [
-                      { symbol: 'KSh', code: 'KES' },
-                      { symbol: '$', code: 'USD' },
-                      { symbol: '€', code: 'EUR' }
-                    ].map((currency) => (
-                      <button
-                        key={currency.code}
-                        onClick={() => {
-                          handleCurrencyChange(currency.symbol);
-                          setIsCurrencyOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors duration-150 ${
-                          selectedSymbol === currency.symbol
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {currency.symbol}
-                      </button>
-                    ))
-                  )}
+            {/* Dropdown Menu */}
+            {isCurrencyOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-40 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-56 overflow-auto py-1">
+                <div className="px-3 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Convert Revenue
                 </div>
-              )}
-            </div>
+                {currencyList && currencyList.length > 0 ? (
+                  currencyList.map((currency) => (
+                    <button
+                      key={currency.code}
+                      onClick={() => {
+                        handleCurrencyChange(currency.symbol);
+                        setIsCurrencyOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors flex items-center justify-between cursor-pointer ${
+                        selectedSymbol === currency.symbol
+                          ? "bg-blue-50 text-blue-700 font-semibold"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      <span>{currency.name || currency.code}</span>
+                      <span className="font-mono text-xs text-gray-500">{currency.symbol}</span>
+                    </button>
+                  ))
+                ) : (
+                  [
+                    { symbol: 'KSh', code: 'KES', name: 'Kenya Shilling' },
+                    { symbol: '$', code: 'USD', name: 'US Dollar' },
+                    { symbol: '€', code: 'EUR', name: 'Euro' },
+                    { symbol: '£', code: 'GBP', name: 'British Pound' }
+                  ].map((currency) => (
+                    <button
+                      key={currency.code}
+                      onClick={() => {
+                        handleCurrencyChange(currency.symbol);
+                        setIsCurrencyOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors flex items-center justify-between cursor-pointer ${
+                        selectedSymbol === currency.symbol
+                          ? "bg-blue-50 text-blue-700 font-semibold"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      <span>{currency.name}</span>
+                      <span className="font-mono text-xs text-gray-500">{currency.symbol}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {/* Time filter */}
-          <div className="flex space-x-2">
+          <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
             {timeFilterPeriods.map((period) => (
               <button
                 key={period}
                 onClick={() => handleTimeFilterChange(period)}
-                className={`px-4 py-2 cursor-pointer rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 cursor-pointer rounded-md text-xs font-medium transition-all ${
                   timeFilter === period
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
                 }`}
               >
                 {period.charAt(0).toUpperCase() + period.slice(1)}
@@ -550,22 +517,25 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-green-700 flex items-center justify-between">
               <div className="flex items-center">
-              <DollarSign className="w-4 h-4 mr-2" />
-              Total Revenue
+                <DollarSign className="w-4 h-4 mr-2" />
+                Total Revenue
               </div>
-              {/* Background refresh indicator */}
-              {loading && (
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-green-600">Updating...</span>
-                </div>
+              {selectedSymbol && selectedSymbol !== "KSh" && (
+                <span className="text-[10px] font-semibold bg-green-200 text-green-800 px-1.5 py-0.5 rounded">
+                  {selectedSymbol} Converted
+                </span>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-green-900">
+            <div className="text-xl font-bold text-green-900">
               {formatRevenueCurrency(stats.totalRevenue)}
             </div>
+            {selectedSymbol && selectedSymbol !== "KSh" && (
+              <p className="text-xs text-green-700 font-medium mt-0.5">
+                Base: KSh {Number(stats.totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            )}
             <p className="text-xs text-green-600 mt-1">
               <TrendingUp className="w-3 h-3 inline mr-1" />
               {timeFilter === "total" ? "All Time" : getTimePeriodText(timeFilter)}
@@ -633,8 +603,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle>Revenue Over Time</CardTitle>
             <p className="text-sm text-gray-500">
-              {timeFilter === "total" ? "All Time" : getTimePeriodText(timeFilter)} - Revenue (
-              {selectedSymbol || "KSh"})
+              {timeFilter === "total" ? "All Time" : getTimePeriodText(timeFilter)} - Revenue (KSh)
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -665,7 +634,7 @@ export default function Dashboard() {
                       axisLine={false}
                     />
                     <Tooltip
-                      formatter={(value) => [new Intl.NumberFormat("en-US", { style: "currency", currency: "KES" }).format(value), "Revenue"]}
+                      formatter={(value) => [`KSh ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Revenue"]}
                       labelStyle={{ color: '#374151' }}
                       contentStyle={{
                         backgroundColor: 'white',
@@ -862,7 +831,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <Badge variant="destructive">
-                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "KES" }).format(invoice.total)}
+                      {`KSh ${Number(invoice.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </Badge>
                   </div>
                 ))

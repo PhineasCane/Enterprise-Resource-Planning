@@ -1,5 +1,5 @@
 const bcrypt = require("bcryptjs");
-const { User } = require("./src/models");
+const { User, sequelize } = require("./src/models");
 
 async function createAdminUser() {
   try {
@@ -7,11 +7,14 @@ async function createAdminUser() {
     const existingAdmin = await User.findOne({ where: { email: "admin@erp.com" } });
     
     if (existingAdmin) {
-      console.log("Admin user already exists!");
+      const hashedPassword = await bcrypt.hash("Africangarden@123", 12);
+      await existingAdmin.update({ password: hashedPassword, isActive: true });
+      console.log("Admin user already exists (password updated)!");
       console.log("Email: admin@erp.com");
-      console.log("Password: admin123");
+      console.log("Password: Africangarden@123");
       console.log("Role: Admin");
-      return;
+      await sequelize.close();
+      process.exit(0);
     }
 
     // Create admin user
@@ -29,15 +32,19 @@ async function createAdminUser() {
 
     console.log("✅ Admin user created successfully!");
     console.log("📧 Email: admin@erp.com");
-    console.log("🔑 Password: admin123");
+    console.log("🔑 Password: Africangarden@123");
     console.log("👤 Role: Admin");
     console.log("📱 Phone: +254700000000");
     console.log("📍 Address: Nairobi, Kenya");
     console.log("✅ Status: Active");
     
+    await sequelize.close();
+    process.exit(0);
   } catch (error) {
     console.error("❌ Error creating admin user:", error.message);
     console.error("Stack trace:", error.stack);
+    await sequelize.close();
+    process.exit(1);
   }
 }
 

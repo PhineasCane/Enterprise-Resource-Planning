@@ -112,14 +112,13 @@ export default function Reports() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <div className="text-2xl font-bold text-green-700">
-                  ${(chartData.revenueVsExpenses.revenue || 0).toLocaleString()}
+                  KSh {(chartData.revenueVsExpenses.revenue || 0).toLocaleString()}
                 </div>
                 <div className="text-sm text-green-700">Total Revenue</div>
               </div>
               <div className="text-center p-4 bg-red-50 rounded-lg">
                 <div className="text-2xl font-bold text-red-700">
-                  $
-                  {(chartData.revenueVsExpenses.expenses || 0).toLocaleString()}
+                  KSh {(chartData.revenueVsExpenses.expenses || 0).toLocaleString()}
                 </div>
                 <div className="text-sm text-red-700">Total Expenses</div>
               </div>
@@ -146,12 +145,12 @@ export default function Reports() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis
-                    tickFormatter={(value) => `$${value.toLocaleString()}`}
+                    tickFormatter={(value) => `KSh ${value.toLocaleString()}`}
                     tick={{ fontSize: 12 }}
-                    width={70}
+                    width={90}
                   />
                   <Tooltip
-                    formatter={(value) => `$${value.toLocaleString()}`}
+                    formatter={(value) => `KSh ${value.toLocaleString()}`}
                     contentStyle={{ borderRadius: "0.5rem" }}
                   />
                   <Legend verticalAlign="top" height={36} />
@@ -267,7 +266,7 @@ export default function Reports() {
                     </span>
                   </div>
                   <span className="text-gray-600">
-                    ${(customer.totalSpent || 0).toLocaleString()}
+                    KSh {(customer.totalSpent || 0).toLocaleString()}
                   </span>
                 </div>
               ))}
@@ -294,7 +293,7 @@ export default function Reports() {
                     {expense.category || "Uncategorized"}
                   </span>
                   <span className="text-gray-600">
-                    ${(expense.total || 0).toLocaleString()}
+                    KSh {(expense.total || 0).toLocaleString()}
                   </span>
                 </div>
               ))}

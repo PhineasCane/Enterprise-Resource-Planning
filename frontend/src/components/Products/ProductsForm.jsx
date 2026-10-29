@@ -13,8 +13,11 @@ export default function ProductsForm({ isOpen, onClose, editProduct, onSuccess }
   
   const [formData, setFormData] = useState({
     name: "",
+    sku: "",
     description: "",
+    costPrice: "",
     pricePer: "",
+    unit: "pcs",
     status: "active"
   });
 
@@ -22,15 +25,21 @@ export default function ProductsForm({ isOpen, onClose, editProduct, onSuccess }
     if (editProduct) {
       setFormData({
         name: editProduct.name || "",
+        sku: editProduct.sku || "",
         description: editProduct.description || "",
+        costPrice: editProduct.costPrice || "",
         pricePer: editProduct.pricePer || "",
+        unit: editProduct.unit || "pcs",
         status: editProduct.status || "active"
       });
     } else {
       setFormData({
         name: "",
+        sku: "",
         description: "",
+        costPrice: "",
         pricePer: "",
+        unit: "pcs",
         status: "active"
       });
     }
@@ -55,7 +64,7 @@ export default function ProductsForm({ isOpen, onClose, editProduct, onSuccess }
     e.preventDefault();
     
     if (!formData.name || !formData.pricePer) {
-      alert("Name and Price per unit are required");
+      alert("Name and Selling Price per unit are required");
       return;
     }
 
@@ -108,6 +117,31 @@ export default function ProductsForm({ isOpen, onClose, editProduct, onSuccess }
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="sku">SKU / Item Code</Label>
+              <Input
+                id="sku"
+                name="sku"
+                value={formData.sku}
+                onChange={handleChange}
+                placeholder="e.g. PRD-001"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="unit">Unit of Measure</Label>
+              <Input
+                id="unit"
+                name="unit"
+                value={formData.unit}
+                onChange={handleChange}
+                placeholder="pcs, kg, box, carton..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+
           <div>
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -121,20 +155,36 @@ export default function ProductsForm({ isOpen, onClose, editProduct, onSuccess }
             />
           </div>
 
-          <div>
-            <Label htmlFor="pricePer">Price per Unit *</Label>
-            <Input
-              id="pricePer"
-              name="pricePer"
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.pricePer}
-              onChange={handleChange}
-              placeholder="0.00"
-              required
-              className="mt-1"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="costPrice">Cost Price (KSh)</Label>
+              <Input
+                id="costPrice"
+                name="costPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.costPrice}
+                onChange={handleChange}
+                placeholder="0.00"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="pricePer">Selling Price (KSh) *</Label>
+              <Input
+                id="pricePer"
+                name="pricePer"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.pricePer}
+                onChange={handleChange}
+                placeholder="0.00"
+                required
+                className="mt-1"
+              />
+            </div>
           </div>
 
           <div>

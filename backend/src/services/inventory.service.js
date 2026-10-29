@@ -28,12 +28,21 @@ class InventoryService {
   /**
    * Add stock to inventory (Stock In)
    */
-  static async stockIn(productId, productName, amount, reason = 'Stock In', reference = null, notes = null) {
-    const transaction = await sequelize.transaction();
+  static async stockIn(productId, productName, amount, reason = 'Stock In', reference = null, notes = null, options = {}) {
+    const isInternalTx = !options.transaction;
+    const transaction = options.transaction || (await sequelize.transaction());
     
     try {
       // Get or create inventory record
-      const inventory = await this.getOrCreateInventory(productId, productName);
+      let inventory = await Inventory.findOne({ where: { productId }, transaction });
+      if (!inventory) {
+        inventory = await Inventory.create({
+          productId,
+          productName,
+          quantity: 0,
+          reorderLevel: 5
+        }, { transaction });
+      }
       
       const previousQuantity = inventory.quantity;
       const newQuantity = previousQuantity + ensureNumeric(amount);
@@ -58,7 +67,9 @@ class InventoryService {
         date: new Date()
       }, { transaction });
       
-      await transaction.commit();
+      if (isInternalTx) {
+        await transaction.commit();
+      }
       
       return {
         success: true,
@@ -71,7 +82,9 @@ class InventoryService {
         }
       };
     } catch (error) {
-      await transaction.rollback();
+      if (isInternalTx) {
+        await transaction.rollback();
+      }
       console.error('Error in stock in operation:', error);
       throw error;
     }
@@ -80,12 +93,13 @@ class InventoryService {
   /**
    * Remove stock from inventory (Stock Out)
    */
-  static async stockOut(productId, productName, amount, reason = 'Stock Out', reference = null, notes = null) {
-    const transaction = await sequelize.transaction();
+  static async stockOut(productId, productName, amount, reason = 'Stock Out', reference = null, notes = null, options = {}) {
+    const isInternalTx = !options.transaction;
+    const transaction = options.transaction || (await sequelize.transaction());
     
     try {
       // Get inventory record
-      const inventory = await Inventory.findOne({ where: { productId } });
+      const inventory = await Inventory.findOne({ where: { productId }, transaction });
       
       if (!inventory) {
         throw new Error(`No inventory record found for product ${productId}`);
@@ -121,7 +135,9 @@ class InventoryService {
         date: new Date()
       }, { transaction });
       
-      await transaction.commit();
+      if (isInternalTx) {
+        await transaction.commit();
+      }
       
       return {
         success: true,
@@ -134,7 +150,9 @@ class InventoryService {
         }
       };
     } catch (error) {
-      await transaction.rollback();
+      if (isInternalTx) {
+        await transaction.rollback();
+      }
       console.error('Error in stock out operation:', error);
       throw error;
     }

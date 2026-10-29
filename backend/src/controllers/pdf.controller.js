@@ -50,7 +50,7 @@ exports.getInvoicePDF = async (req, res, next) => {
             businessProfile.company_reg_number || "TAX-123456789",
           company_logo: "",
           public_server_file: "",
-          currency: businessProfile.currency || "USD",
+          currency: businessProfile.currency || "KSh",
           invoice_footer:
             businessProfile.invoice_footer || "Thank you for your business!",
         }
@@ -65,7 +65,7 @@ exports.getInvoicePDF = async (req, res, next) => {
           company_reg_number: "TAX-123456789",
           company_logo: "",
           public_server_file: "",
-          currency: "USD",
+          currency: "KSh",
           invoice_footer: "Thank you for your business!",
         };
 

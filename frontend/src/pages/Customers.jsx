@@ -91,7 +91,8 @@ export default function Customers() {
   const filteredCustomers = list?.filter(customer =>
     customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone?.includes(searchTerm)
+    customer.phone?.includes(searchTerm) ||
+    customer.taxPin?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   const totalPages = Math.ceil((filteredCustomers.length || 0) / pageSize);
@@ -168,7 +169,7 @@ export default function Customers() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <input
                 type="text"
-                placeholder="Search customers..."
+                placeholder="Search by name, email, phone, or Tax PIN..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -201,9 +202,11 @@ export default function Customers() {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Name</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Tax PIN</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Phone</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Address</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Terms</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Credit Limit</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
@@ -212,17 +215,12 @@ export default function Customers() {
                 {currentCustomers?.map((customer) => (
                   <tr key={customer.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4 font-medium text-gray-900">{customer.name}</td>
+                    <td className="py-3 px-4 text-gray-600 font-mono text-xs">{customer.taxPin || '-'}</td>
                     <td className="py-3 px-4 text-gray-600">{customer.email || '-'}</td>
                     <td className="py-3 px-4 text-gray-600">{customer.phone || '-'}</td>
-                    <td className="py-3 px-4 text-gray-600">
-                      <div className="max-w-xs truncate">
-                        {customer.address ? (
-                          <div className="flex items-center space-x-1">
-                            <MapPin className="h-3 w-3 text-gray-400" />
-                            <span>{customer.address}</span>
-                          </div>
-                        ) : '-'}
-                      </div>
+                    <td className="py-3 px-4 text-gray-600 capitalize">{customer.paymentTerms || 'Net 30'}</td>
+                    <td className="py-3 px-4 text-gray-600 font-medium">
+                      {customer.creditLimit ? `KSh ${Number(customer.creditLimit).toLocaleString()}` : 'KSh 0'}
                     </td>
                     <td className="py-3 px-4">
                       <Badge variant={customer.isActive ? "success" : "secondary"}>

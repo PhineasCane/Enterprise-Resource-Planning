@@ -61,10 +61,7 @@ export default function Products() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'KES'
-    }).format(amount);
+    return `KSh ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const getStatusBadge = (status) => {
@@ -86,7 +83,7 @@ export default function Products() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600 mt-1">Manage your product catalog and pricing</p>
+          <p className="text-gray-600 mt-1">Manage your B2B product catalog and pricing</p>
         </div>
         <Button className="bg-blue-600 hover:bg-blue-700 cursor-pointer" onClick={handleOpenForm}>
           <Plus className="h-5 w-5 mr-2" />
@@ -120,7 +117,7 @@ export default function Products() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Inventory Stock Value</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -132,14 +129,10 @@ export default function Products() {
                   return currentSum + totalPrice;
                 }, 0) || 0;
                 
-                if (isNaN(totalRevenue)) {
-                  return 'KSh 0.00';
-                }
-                
                 return formatCurrency(totalRevenue);
               })()}
             </div>
-            <p className="text-xs text-muted-foreground">Combined value</p>
+            <p className="text-xs text-muted-foreground">Current inventory value</p>
           </CardContent>
         </Card>
         <Card>
@@ -164,7 +157,7 @@ export default function Products() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search products..."
+                placeholder="Search products by name or SKU..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -190,11 +183,13 @@ export default function Products() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">ID</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">SKU</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Quantity</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Price per</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Total Price</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Unit</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">In Stock</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Cost Price</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Selling Price</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Stock Value</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
@@ -202,7 +197,7 @@ export default function Products() {
               <tbody>
                 {list?.map((product) => (
                   <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium text-gray-900">#{product.id}</td>
+                    <td className="py-3 px-4 font-mono text-xs text-gray-700">{product.sku || `#${product.id}`}</td>
                     <td className="py-3 px-4 font-medium text-gray-900">
                       <div>
                         <div className="font-medium">{product.name}</div>
@@ -213,9 +208,10 @@ export default function Products() {
                         )}
                       </div>
                     </td>
+                    <td className="py-3 px-4 text-gray-600 text-sm uppercase">{product.unit || 'pcs'}</td>
                     <td className="py-3 px-4 text-gray-600">
                       <div className="flex items-center">
-                        <span className={product.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
+                        <span className={`font-semibold ${product.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {product.quantity}
                         </span>
                         {product.quantity === 0 && (
@@ -223,8 +219,9 @@ export default function Products() {
                         )}
                       </div>
                     </td>
+                    <td className="py-3 px-4 text-gray-600">{product.costPrice ? formatCurrency(product.costPrice) : '-'}</td>
                     <td className="py-3 px-4 font-medium text-gray-900">{formatCurrency(product.pricePer || product.price || 0)}</td>
-                    <td className="py-3 px-4 font-medium text-gray-900">{formatCurrency(product.totalPrice || 0)}</td>
+                    <td className="py-3 px-4 font-medium text-gray-900">{formatCurrency(product.totalPrice || (product.quantity * (product.pricePer || 0)))}</td>
                     <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center space-x-2">

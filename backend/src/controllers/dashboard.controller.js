@@ -149,7 +149,21 @@ exports.getBasicStats = async (req, res) => {
     });
     console.log('🔍 All unique invoice statuses in database:', allStatuses.map(s => s.status));
 
-    // Execute multiple queries in parallel instead of sequentially
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+
+    const dateFilter = timeFilter === 'total' ? {} : {
+      [Op.or]: [
+        { date: { [Op.between]: [startDateStr, endDateStr] } },
+        { createdAt: { [Op.between]: [startDate, endDate] } }
+      ]
+    };
+
+    const customerDateFilter = timeFilter === 'total' ? {} : {
+      createdAt: { [Op.between]: [startDate, endDate] }
+    };
+
+    // Execute multiple queries in parallel
     const [
       totalRevenue,
       totalExpenses,
@@ -157,30 +171,25 @@ exports.getBasicStats = async (req, res) => {
       newCustomers,
       lowStock
     ] = await Promise.all([
-      // Total Revenue
-      safeSum(Payment, "amount", {
-        where: { createdAt: { [Op.between]: [startDate, endDate] } }
-      }),
+      // Total Revenue (collected payments)
+      safeSum(Payment, "amount", { where: dateFilter }),
       
       // Total Expenses
-      safeSum(Expense, "amount", {
-        where: { createdAt: { [Op.between]: [startDate, endDate] } }
-      }),
+      safeSum(Expense, "amount", { where: dateFilter }),
       
-      // Invoice counts (all in one query)
+      // Invoice counts by status
       Invoice.findAll({
         attributes: [
           'status',
           [sequelize.fn('COUNT', sequelize.col('id')), 'count']
         ],
-        where: { createdAt: { [Op.between]: [startDate, endDate] } },
-        group: ['status']
+        where: dateFilter,
+        group: ['status'],
+        raw: true
       }),
       
       // New customers
-      Customer.count({
-        where: { createdAt: { [Op.between]: [startDate, endDate] } }
-      }),
+      Customer.count({ where: customerDateFilter }),
       
       // Low stock items
       Inventory.count({
@@ -188,22 +197,25 @@ exports.getBasicStats = async (req, res) => {
       })
     ]);
 
-    // Process invoice counts - SIMPLE AND DIRECT
-    console.log('📊 Raw invoice counts:', invoiceCounts);
-    
-    // Access the count directly from dataValues
-    const paid = parseInt(invoiceCounts.find(i => i.status === 'paid')?.dataValues?.count || 0);
-    const unpaid = parseInt(invoiceCounts.find(i => i.status === 'pending')?.dataValues?.count || 0);
-    const overdue = parseInt(invoiceCounts.find(i => i.status === 'overdue')?.dataValues?.count || 0);
-    
+    // Process invoice counts including draft and sent
+    const getCount = (statusName) => {
+      const match = invoiceCounts.find(i => (i.status || '').toLowerCase() === statusName.toLowerCase());
+      return parseInt(match?.count || match?.dataValues?.count || 0);
+    };
+
+    const paid = getCount('paid');
+    const pending = getCount('pending');
+    const sent = getCount('sent');
+    const draft = getCount('draft');
+    const overdue = getCount('overdue');
+    const unpaid = pending + sent + draft;
     const totalInvoices = paid + unpaid + overdue;
-    console.log('📊 Final invoice stats:', { paid, unpaid, overdue, totalInvoices });
 
     const response = {
       timeFilter,
       totalRevenue,
       totalExpenses,
-      invoiceStats: { paid, unpaid, overdue, totalInvoices },
+      invoiceStats: { paid, unpaid, overdue, totalInvoices, draft, sent, pending },
       newCustomers,
       lowStock,
       dateRange: {
@@ -218,7 +230,7 @@ exports.getBasicStats = async (req, res) => {
       data: response
     });
 
-    console.log('Basic stats response prepared successfully');
+    console.log('Basic stats response prepared successfully:', response.invoiceStats);
     res.json(response);
 
   } catch (error) {
@@ -230,141 +242,166 @@ exports.getBasicStats = async (req, res) => {
   }
 };
 
-// Phase 1: Detailed Stats Endpoint (SLOWER - 3-5 seconds)
+// Phase 1: Detailed Stats Endpoint
 exports.getDetailedStats = async (req, res) => {
   try {
     console.log('Detailed stats request received:', req.query);
     const { timeFilter = 'month' } = req.query;
     const { startDate, endDate } = getDateRange(timeFilter);
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
 
     // Check cache first
     const cacheKey = `detailed:${timeFilter}`;
     if (dashboardCache.has(cacheKey)) {
       const cachedData = dashboardCache.get(cacheKey);
-      // Return cached data if it's less than 2 minutes old
-      if (Date.now() - cachedData.timestamp < 2 * 60 * 1000) {
-        console.log('Returning cached detailed stats');
+      if (Date.now() - cachedData.timestamp < 30 * 1000) {
         return res.json(cachedData.data);
       }
     }
 
-    console.log('Date range:', { startDate, endDate });
-    
-    // Debug: Check if we have any payments in the date range
-    const paymentCount = await Payment.count({
-      where: { createdAt: { [Op.between]: [startDate, endDate] } }
-    });
-    console.log('💰 Payment count in date range:', paymentCount);
-    
-    // Debug: Check the actual date values
-    console.log('🔍 Date debugging:', {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      startDateType: typeof startDate,
-      endDateType: typeof endDate,
-      timeFilter
-    });
+    const dateFilter = timeFilter === 'total' ? {} : {
+      [Op.or]: [
+        { date: { [Op.between]: [startDateStr, endDateStr] } },
+        { createdAt: { [Op.between]: [startDate, endDate] } }
+      ]
+    };
 
-    // Execute multiple queries in parallel
-    const [
-      recentInvoices,
-      recentPayments,
-      recentCustomers,
-      topProducts,
-      topCustomers,
-      overdueInvoices
-    ] = await Promise.all([
-      // Recent invoices (limit to what's needed)
-      Invoice.findAll({
-        order: [["createdAt", "DESC"]],
-        limit: 5,
-        attributes: ["id", "status", "createdAt", "total"],
-        include: [{ 
-          model: Customer, 
-          as: "Customer",
-          attributes: ["name"],
-          required: true 
-        }]
-      }),
-      
-      // Recent payments
-      Payment.findAll({
-        order: [["createdAt", "DESC"]],
-        limit: 3,
-        attributes: ["id", "method", "amount", "createdAt"],
-      }),
-      
-      // Recent customers
-      Customer.findAll({
-        order: [["createdAt", "DESC"]],
-        limit: 2,
-        attributes: ["id", "name", "createdAt"],
-      }),
-      
-      // Top products by quantity sold
-      InvoiceItem.findAll({
+    // 1. Recent invoices
+    const recentInvoices = await Invoice.findAll({
+      order: [["createdAt", "DESC"]],
+      limit: 5,
+      attributes: ["id", "number", "status", "createdAt", "total"],
+      include: [{ 
+        model: Customer, 
+        as: "Customer",
+        attributes: ["name"],
+        required: false 
+      }]
+    }).catch(err => {
+      console.warn("Recent invoices query error:", err.message);
+      return [];
+    });
+    
+    // 2. Recent payments
+    const recentPayments = await Payment.findAll({
+      order: [["createdAt", "DESC"]],
+      limit: 5,
+      attributes: ["id", "method", "amount", "createdAt"],
+    }).catch(err => {
+      console.warn("Recent payments query error:", err.message);
+      return [];
+    });
+    
+    // 3. Recent customers
+    const recentCustomers = await Customer.findAll({
+      order: [["createdAt", "DESC"]],
+      limit: 3,
+      attributes: ["id", "name", "createdAt"],
+    }).catch(err => {
+      console.warn("Recent customers query error:", err.message);
+      return [];
+    });
+    
+    // 4. Top products by quantity sold (resilient decoupled query)
+    let processedTopProducts = [];
+    try {
+      const itemDateFilter = timeFilter === 'total' ? {} : {
+        createdAt: { [Op.between]: [startDate, endDate] }
+      };
+
+      const productSales = await InvoiceItem.findAll({
         attributes: [
           "productId", 
-          [sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'totalSold']
+          [sequelize.fn('SUM', sequelize.col('quantity')), 'totalSold']
         ],
-        include: [{ 
-          model: Product, 
-          as: "Product",
-          attributes: ["name"],
-          required: true 
-        }],
-        where: timeFilter !== 'total' ? {
-          createdAt: {
-            [Op.between]: [startDate, endDate]
-          }
-        } : {},
-        group: ['InvoiceItem.productId', 'Product.id', 'Product.name'],
-        order: [[sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'DESC']],
+        where: itemDateFilter,
+        group: ['productId'],
+        order: [[sequelize.literal('"totalSold"'), 'DESC']],
         limit: 5,
-      }),
-      
-      // Top customers by invoice total
-      Invoice.findAll({
+        raw: true
+      });
+
+      if (productSales.length > 0) {
+        const productIds = productSales.map(item => item.productId);
+        const products = await Product.findAll({
+          where: { id: productIds },
+          attributes: ["id", "name"],
+          raw: true
+        });
+
+        processedTopProducts = productSales.map(sale => {
+          const product = products.find(p => p.id === sale.productId);
+          return {
+            name: product ? product.name : `Product #${sale.productId}`,
+            sold: parseInt(sale.totalSold) || 0
+          };
+        });
+      }
+    } catch (productError) {
+      console.warn("⚠️ Could not fetch top products:", productError.message);
+      processedTopProducts = [];
+    }
+    
+    // 5. Top customers by invoice total (resilient decoupled query)
+    let processedTopCustomers = [];
+    try {
+      const customerSales = await Invoice.findAll({
         attributes: [
           "customerId", 
-          [sequelize.fn('SUM', sequelize.col('Invoice.total')), 'totalSpent']
+          [sequelize.fn('SUM', sequelize.col('total')), 'totalSpent']
         ],
-        include: [{ 
-          model: Customer, 
-          as: "Customer",
-          attributes: ["name"],
-          required: true 
-        }],
-        where: {
-          createdAt: {
-            [Op.between]: [startDate, endDate]
-          }
-        },
-        group: ['Invoice.customerId', 'Customer.id', 'Customer.name'],
-        order: [[sequelize.fn('SUM', sequelize.col('Invoice.total')), 'DESC']],
+        where: dateFilter,
+        group: ['customerId'],
+        order: [[sequelize.literal('"totalSpent"'), 'DESC']],
         limit: 5,
-      }),
-      
-      // Overdue invoices
-      Invoice.findAll({
-        where: { status: "overdue" },
-        attributes: ["id", "total", "dueDate", "createdAt"],
-        include: [{ 
-          model: Customer, 
-          as: "Customer",
-          attributes: ["name"],
-          required: true 
-        }],
-        order: [["dueDate", "ASC"]],
-      })
-    ]);
+        raw: true
+      });
+
+      if (customerSales.length > 0) {
+        const customerIds = customerSales.map(item => item.customerId);
+        const customers = await Customer.findAll({
+          where: { id: customerIds },
+          attributes: ["id", "name"],
+          raw: true
+        });
+
+        processedTopCustomers = customerSales.map(sale => {
+          const customer = customers.find(c => c.id === sale.customerId);
+          return {
+            name: customer ? customer.name : `Customer #${sale.customerId}`,
+            spent: parseFloat(sale.totalSpent) || 0
+          };
+        });
+      }
+    } catch (customerError) {
+      console.warn("⚠️ Could not fetch top customers:", customerError.message);
+      processedTopCustomers = [];
+    }
+    
+    // 6. Overdue invoices
+    const overdueInvoices = await Invoice.findAll({
+      where: { status: "overdue" },
+      attributes: ["id", "number", "total", "dueDate", "createdAt"],
+      include: [{ 
+        model: Customer, 
+        as: "Customer",
+        attributes: ["name"],
+        required: false 
+      }],
+      order: [["dueDate", "ASC"]],
+      limit: 10
+    }).catch(err => {
+      console.warn("Overdue invoices query error:", err.message);
+      return [];
+    });
 
     // Combine and sort recent activities
     const allActivities = [
       ...recentInvoices.map((i) => ({
         type: 'invoice',
         id: i.id,
-        text: `Invoice #${i.id} ${i.status} - $${i.total}`,
+        text: `Invoice #${i.number || i.id} ${i.status} - KSh ${(parseFloat(i.total) || 0).toLocaleString()}`,
         customer: i.Customer?.name,
         date: i.createdAt,
         status: i.status
@@ -372,7 +409,7 @@ exports.getDetailedStats = async (req, res) => {
       ...recentPayments.map((p) => ({
         type: 'payment',
         id: p.id,
-        text: `Payment #${p.id} $${p.amount} received`,
+        text: `Payment #${p.id} KSh ${(parseFloat(p.amount) || 0).toLocaleString()} received`,
         method: p.method,
         date: p.createdAt,
         amount: p.amount
@@ -557,18 +594,6 @@ exports.getDetailedStats = async (req, res) => {
         { date: 'Error', revenue: 0 }
       ];
     }
-
-    // Process top products
-    const processedTopProducts = topProducts.map(item => ({
-      name: item.Product?.name || 'Unknown Product',
-      sold: parseInt(item.dataValues.totalSold) || 0
-    }));
-
-    // Process top customers
-    const processedTopCustomers = topCustomers.map(invoice => ({
-      name: invoice.Customer?.name || 'Unknown Customer',
-      spent: parseFloat(invoice.dataValues.totalSpent) || 0
-    }));
 
     const response = {
       timeFilter,

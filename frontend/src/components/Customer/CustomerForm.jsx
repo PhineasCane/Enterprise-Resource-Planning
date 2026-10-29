@@ -24,6 +24,9 @@ const CustomerForm = ({ isOpen, onClose, editCustomer, onSuccess }) => {
         name: form.name.value.trim(),
         email: form.email.value.trim(),
         phone: form.phone.value.trim(),
+        taxPin: form.taxPin ? form.taxPin.value.trim() : "",
+        creditLimit: form.creditLimit ? parseFloat(form.creditLimit.value) || 0 : 0,
+        paymentTerms: form.paymentTerms ? form.paymentTerms.value.trim() : "Cash",
         address: form.address.value.trim(),
         country: form.country.value.trim(),
         city: form.city.value.trim(),
@@ -77,13 +80,53 @@ const CustomerForm = ({ isOpen, onClose, editCustomer, onSuccess }) => {
         {/* Form */}
         <form id="customer-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Company / Customer Name *</label>
             <input
               name="name"
               type="text"
               defaultValue={editCustomer?.name || ""}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tax PIN / VAT</label>
+              <input
+                name="taxPin"
+                type="text"
+                placeholder="e.g. P051234567X"
+                defaultValue={editCustomer?.taxPin || ""}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+              <select
+                name="paymentTerms"
+                defaultValue={editCustomer?.paymentTerms || "Cash"}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              >
+                <option value="Cash">Cash / Immediate</option>
+                <option value="Net 7">Net 7 Days</option>
+                <option value="Net 15">Net 15 Days</option>
+                <option value="Net 30">Net 30 Days</option>
+                <option value="Net 60">Net 60 Days</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Credit Limit (KSh)</label>
+            <input
+              name="creditLimit"
+              type="number"
+              min="0"
+              step="1000"
+              placeholder="0.00"
+              defaultValue={editCustomer?.creditLimit || 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
@@ -162,7 +205,7 @@ const CustomerForm = ({ isOpen, onClose, editCustomer, onSuccess }) => {
             <label className="text-sm font-medium text-gray-700">Active Status</label>
           </div>
           <p className="text-xs text-gray-500">
-            Active customers can be selected for invoices and other operations. Inactive customers are hidden from most lists.
+            Active customers can be selected for invoices and sales orders.
           </p>
         </form>
 

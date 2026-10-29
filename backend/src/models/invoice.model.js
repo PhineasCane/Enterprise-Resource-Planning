@@ -10,19 +10,19 @@ const Invoice = sequelize.define("Invoice", {
   date: { type: DataTypes.DATEONLY, allowNull: false },
   dueDate: { type: DataTypes.DATEONLY, allowNull: false },
   status: {
-    type: DataTypes.ENUM("draft", "pending", "sent", "paid", "overdue"),
+    type: DataTypes.ENUM("draft", "pending", "sent", "paid", "overdue", "cancelled"),
     defaultValue: "draft",
   },
   subtotal: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   taxRate: { type: DataTypes.DECIMAL(5, 2), defaultValue: 0 },
   taxAmount: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   total: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
+  paidAmount: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   notes: { type: DataTypes.TEXT },
   createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
 }, {
   getterMethods: {
-    // Ensure numeric fields are always returned as numbers
     getSubtotal() {
       return parseFloat(this.getDataValue('subtotal')) || 0;
     },
@@ -34,10 +34,12 @@ const Invoice = sequelize.define("Invoice", {
     },
     getTotal() {
       return parseFloat(this.getDataValue('total')) || 0;
+    },
+    getPaidAmount() {
+      return parseFloat(this.getDataValue('paidAmount')) || 0;
     }
   },
   setterMethods: {
-    // Ensure numeric fields are stored as numbers
     setSubtotal(value) {
       this.setDataValue('subtotal', ensureNumeric(value));
     },
@@ -49,6 +51,9 @@ const Invoice = sequelize.define("Invoice", {
     },
     setTotal(value) {
       this.setDataValue('total', ensureNumeric(value));
+    },
+    setPaidAmount(value) {
+      this.setDataValue('paidAmount', ensureNumeric(value));
     }
   }
 });
@@ -59,6 +64,7 @@ Invoice.beforeCreate(async (invoice) => {
   if (invoice.taxRate !== undefined) invoice.taxRate = ensureNumeric(invoice.taxRate);
   if (invoice.taxAmount !== undefined) invoice.taxAmount = ensureNumeric(invoice.taxAmount);
   if (invoice.total !== undefined) invoice.total = ensureNumeric(invoice.total);
+  if (invoice.paidAmount !== undefined) invoice.paidAmount = ensureNumeric(invoice.paidAmount);
 });
 
 Invoice.beforeUpdate(async (invoice) => {
@@ -66,6 +72,7 @@ Invoice.beforeUpdate(async (invoice) => {
   if (invoice.changed('taxRate')) invoice.taxRate = ensureNumeric(invoice.taxRate);
   if (invoice.changed('taxAmount')) invoice.taxAmount = ensureNumeric(invoice.taxAmount);
   if (invoice.changed('total')) invoice.total = ensureNumeric(invoice.total);
+  if (invoice.changed('paidAmount')) invoice.paidAmount = ensureNumeric(invoice.paidAmount);
 });
 
 // Ensure numeric fields are properly formatted when serializing to JSON
@@ -87,6 +94,7 @@ Invoice.prototype.toJSON = function() {
   values.taxRate = safeParseFloat(values.taxRate);
   values.taxAmount = safeParseFloat(values.taxAmount);
   values.total = safeParseFloat(values.total);
+  values.paidAmount = safeParseFloat(values.paidAmount);
   
   return values;
 };
